@@ -48,6 +48,7 @@ window.onload = function () {
       };
   var cropper = new Cropper(image, options);
   var originalImageURL = image.src;
+  var uploadedImageType = 'image/jpeg';
   var uploadedImageURL;
 
   // Tooltip
@@ -119,6 +120,7 @@ window.onload = function () {
   actions.querySelector('.docs-buttons').onclick = function (event) {
     var e = event || window.event;
     var target = e.target || e.srcElement;
+    var cropped;
     var result;
     var input;
     var data;
@@ -142,9 +144,11 @@ window.onload = function () {
     data = {
       method: target.getAttribute('data-method'),
       target: target.getAttribute('data-target'),
-      option: target.getAttribute('data-option'),
-      secondOption: target.getAttribute('data-second-option')
+      option: target.getAttribute('data-option') || undefined,
+      secondOption: target.getAttribute('data-second-option') || undefined
     };
+
+    cropped = cropper.cropped;
 
     if (data.method) {
       if (typeof data.target !== 'undefined') {
@@ -159,13 +163,42 @@ window.onload = function () {
         }
       }
 
-      if (data.method === 'getCroppedCanvas') {
-        data.option = JSON.parse(data.option);
+      switch (data.method) {
+        case 'rotate':
+          if (cropped) {
+            cropper.clear();
+          }
+
+          break;
+
+        case 'getCroppedCanvas':
+          try {
+            data.option = JSON.parse(data.option);
+          } catch (e) {
+            console.log(e.message);
+          }
+
+          if (uploadedImageType === 'image/jpeg') {
+            if (!data.option) {
+              data.option = {};
+            }
+
+            data.option.fillColor = '#fff';
+          }
+
+          break;
       }
 
       result = cropper[data.method](data.option, data.secondOption);
 
       switch (data.method) {
+        case 'rotate':
+          if (cropped) {
+            cropper.crop();
+          }
+
+          break;
+
         case 'scaleX':
         case 'scaleY':
           target.setAttribute('data-option', -data.option);
@@ -173,12 +206,11 @@ window.onload = function () {
 
         case 'getCroppedCanvas':
           if (result) {
-
             // Bootstrap's Modal
             $('#getCroppedCanvasModal').modal().find('.modal-body').html(result);
 
             if (!download.disabled) {
-              download.href = result.toDataURL('image/jpeg');
+              download.href = result.toDataURL(uploadedImageType);
             }
           }
 
@@ -249,6 +281,8 @@ window.onload = function () {
         file = files[0];
 
         if (/^image\/\w+/.test(file.type)) {
+          uploadedImageType = file.type;
+
           if (uploadedImageURL) {
             URL.revokeObjectURL(uploadedImageURL);
           }
